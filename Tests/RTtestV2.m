@@ -1,7 +1,9 @@
 clear all; close all; clc
 
+% Fetching map
 viewer = siteviewer(Buildings="map.osm");
 
+% Set receiver position
 rx = rxsite(Latitude=59.405220, ...
     Longitude=17.946607, ...
     AntennaHeight=30);
@@ -10,7 +12,7 @@ show(rx)
 pm = propagationModel("raytracing", Method="sbr", MaxNumDiffractions=2, ...
     MaxNumReflections=3);
 
-
+% Struct to store ray properties
 propagationData = struct();
 
 for i = 1:10
@@ -23,17 +25,19 @@ for i = 1:10
 
     rays = raytrace(tx,rx,pm);
     
-    plot(rays{1}, Type="power");
+    plot(rays{1}, Type="power"); % Plotting propagation paths
     propagationData(i).Phase = NaN;
-        
+       
     if ~isempty(rays) && ~isempty(rays{1})
 
+        % Selecting rays with specific number of interactions
         numInt = [rays{1}.NumInteractions];
         selected = rays{1}(numInt <= 3);
 
         %phases = [selected.PhaseShift];
         %pathLoss = [selected.PathLoss];
 
+        % Storing phase shift and path loss for each ray
         propagationData(i).Phase = [selected.PhaseShift];
         propagationData(i).PathLoss = [selected.PathLoss];
         
@@ -48,7 +52,7 @@ for i = 1:10
   
 end
 
-
+% Print 
 for k = 1:length(rays{1})
     
     fprintf('\n========== Ray %d ==========\n', k);
@@ -56,8 +60,9 @@ for k = 1:length(rays{1})
     
 end
 
-
+fprintf('Phase\n')
 disp([propagationData.Phase])
+fprintf('Path Loss\n')
 disp([propagationData.PathLoss])
 
 
@@ -80,5 +85,5 @@ for d = 1:length(rays{1})
 end
 
 
-diffractionRays = rays{1}(selectedIdx)
+diffractionRays = rays{1}(selectedIdx);
 
