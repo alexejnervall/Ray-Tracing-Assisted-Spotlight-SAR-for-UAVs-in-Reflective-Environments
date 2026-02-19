@@ -60,10 +60,10 @@ for k = 1:length(rays{1})
     
 end
 
-fprintf('Phase\n')
-disp([propagationData.Phase])
-fprintf('Path Loss\n')
-disp([propagationData.PathLoss])
+%fprintf('== Phase ==\n')
+%disp([propagationData.Phase])
+%fprintf('== Path Loss ==\n')
+%disp([propagationData.PathLoss])
 
 
 %% Trying to extract rays with only diffraction interactions 
