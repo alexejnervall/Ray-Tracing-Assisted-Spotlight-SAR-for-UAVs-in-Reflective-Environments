@@ -1,6 +1,6 @@
 clearvars; close all; clc
 
-% Radar params
+%% Radar params
 
 c = physconst('LightSpeed');
 
@@ -20,7 +20,7 @@ fs = 120*10^6;                                  % Sampling frequency [Hz]
 waveform = phased.LinearFMWaveform('SampleRate',fs, 'PulseWidth', tpd, 'PRF', prf,...
     'SweepBandwidth', bw);
 
-% Radar platform motion 
+%% Radar platform motion 
 
 speed = 100;                                    % [m/s]  
 flightDuration = 4;                             % [s]
@@ -37,28 +37,40 @@ fastTime = (0:1/fs:(truncrangesamples-1)/fs);
 % Set the reference range for the cross-range processing.
 Rc = 1e3;                                       % [m]
 
-% Tx and Rx config 
+%% Tx and Rx config 
 
+% Creating single antenna element with cosine radiation pattern 
 antenna = phased.CosineAntennaElement('FrequencyRange', [1e9 6e9]);
+
+% Converting physical antenna area to antenna gain in dB 
 antennaGain = aperture2gain(aperture,c/fc); 
 
+% Transmitter: scaling signal amplitude by power and antenna gain
 transmitter = phased.Transmitter('PeakPower', 1e3, 'Gain', antennaGain);
+
+% Radiator: converting  digital waveform to radiated EM field in 3D space
 radiator = phased.Radiator('Sensor', antenna,'OperatingFrequency', fc, 'PropagationSpeed', c);
 
+% Collector: converting incoming EM waves from targets into a baseband signal at the receiver
 collector = phased.Collector('Sensor', antenna, 'PropagationSpeed', c,'OperatingFrequency', fc);
+
+% Receiver: taking collected signal and outputs digitized radar echoes 
 receiver = phased.ReceiverPreamp('SampleRate', fs, 'NoiseFigure', 30);
 
+%% Target
 
-% Target
-
+% Stationary targets 
 targetpos= [900,0,0;1000,-30,0]';
 targetvel = [0,0,0;0,0,0]';
 
 squintangle = atand(600/950);
+
+% Target object applies amplitude scaling and phase shift to reflected signal 
 target = phased.RadarTarget('OperatingFrequency', fc, 'MeanRCS', [1,1]);
 pointTargets = phased.Platform('InitialPosition', targetpos,'Velocity',targetvel);
 
 % Ground truth plot
+
 figure(1);
 h = axes;plot(targetpos(2,1),targetpos(1,1),'*b');hold on;plot(targetpos(2,2),targetpos(1,2),'*r');hold off;
 set(h,'Ydir','reverse');xlim([-50 10]);ylim([800 1200]);
@@ -72,27 +84,29 @@ pm = propagationModel("raytracing", ...
     MaxNumReflections=1, ...
     MaxNumDiffractions=0);
 
+% Init 2D matrix for SAR data 
 rxsig = zeros(truncrangesamples,numpulses);
 
+% Looping over all radar pulses 
 for ii = 1:numpulses
 
     % Update radar platform and target position
     [radarpos, radarvel] = radarPlatform(slowTime);
     [targetpos,targetvel] = pointTargets(slowTime);
 
-    % Define radar transmitter site
+    % Modeling the radar as Tx in 3D space 
     tx = txsite("cartesian", ...
         "AntennaPosition", radarpos(:), ...
         "TransmitterFrequency", fc);
 
+    % Looping over each target
     for k = 1:size(targetpos,2)
 
-        % Target as receiver site
+        % Target as receiver of the pulse 
         rx = rxsite("cartesian", ...
             "AntennaPosition", targetpos(:,k));
 
         % Ray tracing
-
         rays = raytrace(tx,rx,pm);
 
         if isempty(rays)
@@ -100,20 +114,27 @@ for ii = 1:numpulses
         end
 
         rayset = rays{1};
-        rangeHistory(ii) = rayset(1).PropagationDistance;
-
+        %rangeHistory(ii) = rayset(1).PropagationDistance;
+        
+        % Loop over rays for each target
         for r = 1:length(rayset)
 
+            % Propagation distance along the ray
             dist = rayset(r).PropagationDistance;
+
+            % Round trip delay 
             tau = 2*dist/c;
 
+            % Generating an LFM pulse 
             sig = waveform();
             sig = sig(1:truncrangesamples);
             
+            % Computing delay and phase 
             delay = round(tau*fs);
             loss = db2pow(-rayset(r).PathLoss);
             phase = loss * exp(-1i*4*pi*fc*dist/c);
             
+            % Add delayed echo to raw data 
             if delay < truncrangesamples
             
                 valid = 1:(truncrangesamples-delay);
@@ -131,7 +152,8 @@ plot(rangeHistory)
 title('Raytrace range history')
 
 kc = (2*pi*fc)/c;
-% Compensate for the doppler due to the squint angle
+ 
+% Phase correction for Doppler due to squint angle 
 rxsig=rxsig.*exp(-1i.*2*(kc)*sin(deg2rad(squintangle))*repmat(speed*eta1,1,truncrangesamples)).';
 
 % Visualization 
