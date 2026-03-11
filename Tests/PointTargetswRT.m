@@ -66,15 +66,8 @@ targetvel = [0,0,0;0,0,0; 0,0,0]';
 squintangle = atand(600/950);
 
 % Target object applies amplitude scaling and phase shift to reflected signal 
-target = phased.RadarTarget('OperatingFrequency', fc, 'MeanRCS', [1,1,1]);
+target = phased.RadarTarget('OperatingFrequency', fc, 'MeanRCS', ones(1,size(targetpos,2)));
 pointTargets = phased.Platform('InitialPosition', targetpos,'Velocity',targetvel);
-
-% Ground truth plot
-
-% figure(1)
-% h = axes;plot(targetpos(2,1),targetpos(1,1),'*b');hold on;plot(targetpos(2,2),targetpos(1,2),'*r');hold off;
-% set(h,'Ydir','reverse');xlim([-50 10]);ylim([800 1200])
-% title('Ground Truth');ylabel('Range');xlabel('Cross-Range');
 
 % Ground truth plot (plotting all targets regardless of number) 
 
@@ -130,7 +123,6 @@ for ii = 1:numpulses
         end
 
         rayset = rays{1};
-        %rangeHistory(ii) = rayset(1).PropagationDistance;
         
         % Loop over rays for each target
         for r = 1:length(rayset)
@@ -163,9 +155,6 @@ for ii = 1:numpulses
     end
 end
 
-% figure
-% plot(rangeHistory)
-% title('Raytrace range history')
 
 kc = (2*pi*fc)/c;
  
