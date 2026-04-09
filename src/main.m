@@ -4,18 +4,19 @@ clearvars; close all; clc
 
 c = physconst('LightSpeed');
 
-fc = 10e9;                                      % Carrier frequency [Hz]
+fc = 10e9;                          % Carrier frequency [Hz]
 
-rangeResolution = 1;                            % [m]
-crossRangeResolution = 1;                       % [m]
+dR = 1;                             % [m]
+dA = 1;                             % [m]
 
-bw = c/(2*rangeResolution);                     % bandwidth [Hz]
+bw = c/(2*dR);                      % bandwidth [Hz]
 
-prf = 300;                                      % [Hz]
-aperture = 0.673;                                % [m^2]
+prf = 1500;                         % [Hz]
+aperture = 0.673;                   % [m^2]
 
-tpd = 3*10^-6;                                  % Pulse duration [s]
-fs = 300*10^6;                                  % Sampling frequency [Hz]
+tpd = 3*10^-6;                      % Pulse duration [s]
+fs = 300*10^6;                      % Sampling frequency [Hz]
+lambda = c/fc;                      % Wavelength [m]
 
 
 waveform = phased.LinearFMWaveform('SampleRate',fs, 'PulseWidth', tpd, 'PRF', prf,...
@@ -23,42 +24,38 @@ waveform = phased.LinearFMWaveform('SampleRate',fs, 'PulseWidth', tpd, 'PRF', pr
 
 %% %% ----------- RADAR PLATFORM MOTION ----------- %% %%
 
-speed = 100;                                     % [m/s]  
-flightDuration = 4;                             % [s]
+v = 50;                                     
+Rmax = 700; 
+L0syn = (lambda*Rmax)/(2*dA);
+T0 = ceil(L0syn/v);                           
 
-x0 = -120;
-y0 = -200;
+
+T = 1;
+Lsyn = T*v;
+prfMin = (2*v*Lsyn)/(lambda*Rmax);
+
+x0 = 0;
+y0 = -(Lsyn/2);
 z0 = 200;
 
-radarPlatform  = phased.Platform('InitialPosition', [x0; y0; z0], 'Velocity', [0; speed; 0]);
+radarPlatform  = phased.Platform('InitialPosition', [x0; y0; z0], 'Velocity', [0; v; 0]);
 
 % Azimuth sampling 
 slowTime = 1/prf;
-n = flightDuration/slowTime +1;                 % Transmitted pulses
-slowTimeVec = linspace(0,flightDuration , n)';   % Slow time vector 
+n = T/slowTime +1;                  % Transmitted pulses
+slowTimeVec = linspace(0,T , n)';   % Slow time vector 
 
 % Range sampling
-maxRange = 1000;
-truncRangesamples = ceil((2*maxRange/c)*fs);
+truncRangesamples = ceil((2*Rmax/c)*fs);
 fastTime = (0:1/fs:(truncRangesamples-1)/fs);
-
-%% %% ----------- TX AND RX CONFIG ----------- %% %%
-
-
-% Creating single antenna element with cosine radiation pattern 
-antenna = phased.CosineAntennaElement('FrequencyRange', [1e9 6e9]); % THIS FREQUENCY RANGE IS WRONG NO???!!!!
-
-% Converting physical antenna area to antenna gain in dB 
-antennaGain = aperture2gain(aperture,c/fc); 
-
-% Transmitter: scaling signal amplitude by power and antenna gain
-transmitter = phased.Transmitter('PeakPower', 1e3, 'Gain', antennaGain);
 
 
 %% %% ----------- TARGET DEFINITION ----------- %% %%
 
+mapTarget = false;
+cubeTarget = true;
 
-points = pointCloudGeneration(x0, y0, z0);
+points = pointCloudGeneration(x0, y0, z0, mapTarget, cubeTarget);
 
 targetPos = points';
 targetVel = zeros(size(targetPos));
@@ -81,17 +78,13 @@ radarPosHist = zeros(3, n);
 
 radarPlatformTemp = phased.Platform( ...
     'InitialPosition', [x0; y0; z0], ...
-    'Velocity', [0; speed; 0]);
+    'Velocity', [0; v; 0]);
 
 for ii = 1:n
     [pos, ~] = radarPlatformTemp(slowTime);
     radarPosHist(:,ii) = pos;
 end
 
-sceneCenter = mean(targetPos, 2);
-lookVec = sceneCenter - radarPosHist;
-lookVecNorm = lookVec ./ vecnorm(lookVec);
-squintAngle = 0;
 
 figure
 h = axes;
@@ -124,8 +117,36 @@ set(h,'YDir','reverse')
 
 view(45,30)  
 
+%% %% ----------- GEOMETRY CALCULATIONS ----------- %% %%
+
+
+sceneCenter = mean(targetPos, 2);
+lookVec = sceneCenter - radarPosHist;
+lookVecNorm = lookVec ./ vecnorm(lookVec);
+Rc = norm(sceneCenter - radarPosHist(:, round(end/2)));
+xc = mean(targetPos(1, :));
+yc = mean(targetPos(2, :));
+AoA = atand(z0/xc);
+squintAngle = 0;
 
 %% %% ----------- SAR SIGNAL SIMULATION USING RAY TRACING ----------- %% %%
+
+% Disturbances 
+
+sx = 0.01;
+sz = 0.0; 
+disturbances = false;
+
+radarPosNom = zeros(3, n);
+
+for jj = 1:n
+    [pos, ~] = radarPlatform(slowTime);
+    radarPosNom(:, jj) = pos;
+end
+
+[radarPosDisturbed, trajError] = trajectoryGeneration(radarPosNom, sx, sz, disturbances);
+
+% --- 
 
 pm = propagationModel("raytracing", ...
     Method="sbr", ...
@@ -141,12 +162,12 @@ for ii = 1:n
 
     sig = waveform();
     sig = sig(1:truncRangesamples);
-    sig = transmitter(sig);
 
-    [radarpos, radarvel] = radarPlatform(slowTime);
+    radarPos = radarPosDisturbed(:, ii);
+    %[radarpos, radarvel] = radarPlatform(slowTime);
     [targetPos,targetVel] = pointTargets(slowTime);
 
-    tx = txsite("cartesian", "AntennaPosition", radarpos(:), "TransmitterFrequency", fc);
+    tx = txsite("cartesian", "AntennaPosition", radarPos(:), "TransmitterFrequency", fc);
 
     for k = 1:size(targetPos,2)
 
@@ -208,11 +229,8 @@ colormap('gray')
 
 %% %% ----------- IMAGE FORMATION ----------- %% %%
 
-% Computing reference range 
-Rc = norm(sceneCenter - radarPosHist(:,round(end/2)));
-
 % Azimuth compression
-rmaProcessed = RMA(cdata,fastTime,fc,fs,prf,speed,n,c,Rc,squintAngle);
+rmaProcessed = RMA(cdata, fastTime, fc, fs, prf, v, n, c, Rc, squintAngle);
 
 sarImage = abs(rmaProcessed);
 
@@ -229,3 +247,20 @@ colormap('gray')
 rmsContrast = computeRMSContrast(sarImage)
 
 entropy = entropy(sarImage)
+
+
+%% %% ----------- ERROR PLOTS ----------- %% %%
+
+figure(5)
+plot(trajError(1, :))
+title('Crossrange Disturbance')
+xlabel('Pulse Number')         
+ylabel('Error [m]')             
+legend('Crossrange Error')      
+
+figure(6)
+plot(trajError(3, :))
+title('Altitude Disturbance')
+xlabel('Pulse Number')         
+ylabel('Error [m]')             
+legend('Altitude Error')     
