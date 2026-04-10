@@ -97,7 +97,7 @@ figure(1);
 clf;
 
 scatter3(targetPos(1,:), targetPos(2,:), targetPos(3,:), ...
-    50, 'r', 'filled');
+    50, 'm', 'filled');
 
 grid on;
 axis equal;
@@ -118,11 +118,11 @@ axis equal;
 
 % Targets
 scatter3(targetPos(1,:), targetPos(2,:), targetPos(3,:), ...
-    50, 'r', 'filled');
+    50, 'm', 'filled');
 
 % Radar trajectory
 plot3(radarPosHist(1,:), radarPosHist(2,:), radarPosHist(3,:), ...
-    'b', 'LineWidth', 2);
+    'r', 'LineWidth', 2);
 
 % Look direction
 step = max(1, round(size(radarPosHist,2)/30));
@@ -134,7 +134,7 @@ quiver3( ...
     lookVec(1,1:step:end), ...
     lookVec(2,1:step:end), ...
     lookVec(3,1:step:end), ...
-    5, 'k');
+    5, 'w');
 
 % Labels
 xlabel('X');
