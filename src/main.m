@@ -34,7 +34,7 @@ T = 1;
 Lsyn = T*v;
 prfMin = (2*v*Lsyn)/(lambda*Rmax);
 
-x0 = 0;
+x0 = -120;
 y0 = -(Lsyn/2);
 z0 = 200;
 
@@ -54,8 +54,8 @@ fastTime = (0:1/fs:(truncRangesamples-1)/fs);
 
 %% %% ----------- TARGET DEFINITION ----------- %% %%
 
-mapTarget = true;
-cubeTarget = false;
+mapTarget = false;
+cubeTarget = true;
 
 points = pointCloudGeneration(x0, y0, z0, mapTarget, cubeTarget);
 
@@ -150,7 +150,7 @@ view(45,30);
 
 sx = 0.01;
 sz = 0.0; 
-disturbances = false;
+disturbances = true;
 
 radarPosNom = zeros(3, n);
 
@@ -267,7 +267,7 @@ rmsContrast = computeRMSContrast(sarImage)
 entropy = entropy(sarImage)
 
 
-%% %% ----------- ERROR PLOTS ----------- %% %%
+%% %% ----------- DISTURBANCE ERROR PLOTS ----------- %% %%
 
 figure(5)
 plot(trajError(1, :))
@@ -282,3 +282,6 @@ title('Altitude Disturbance')
 xlabel('Pulse Number')         
 ylabel('Error [m]')             
 legend('Altitude Error')     
+
+%% ----------- DISTURBANCE TO IMAGE QUALITY PLOTS ----------- %%
+
