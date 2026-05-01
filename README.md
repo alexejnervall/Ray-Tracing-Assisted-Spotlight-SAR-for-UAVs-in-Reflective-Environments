@@ -1,2 +1,4 @@
-# GPU-Accelerated-Radio-Wave-Ray-Tracing-
-Master's Thesis on GPU Accelerated Radio Wave Ray Tracing as a ground truth for LiDAR sensing in robotics navigation in reflective environments
+# Ray Tracing-Assisted Spotlight SAR for UAVs in Reflective Environments
+Master's Thesis on Ray Tracing-Assisted Spotlight SAR for UAVs in Reflective Environments - Assessing the Influence of Pose Stability on Image Formation
+
+## About The Project
